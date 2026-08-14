@@ -713,7 +713,7 @@ class Ikm extends ComicSource {
   // 基础配置
   name = "爱看漫";
   key = "ikmmh";
-  version = "1.0.6";
+  version = "1.0.7";
   minAppVersion = "1.0.0";
   url = "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/ikmmh.js";
   // 常量定义
@@ -976,7 +976,7 @@ class Ikm extends ComicSource {
               title: e.name.split("~")[0],
               subTitle: e.author,
               cover: e.cover,
-              tags: e.tags,
+              tags: Array.isArray(e.tags) ? e.tags : [],
               description: e.lastchapter,
             })),
             maxPage: resData.end || 1,
