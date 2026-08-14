@@ -1,5 +1,9 @@
 /** @type {import('./_venera_.js')} */
 
+const toStr = (v) => (typeof v === "string" ? v : v == null ? "" : String(v));
+const toStrList = (v) =>
+  Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+
 function getValidatorCookie(htmlString) {
   const cookieRegex = /document\.cookie\s*=\s*(["'])([\s\S]*?)\1/;
   const match = htmlString.match(cookieRegex);
@@ -713,9 +717,9 @@ class Ikm extends ComicSource {
   // 基础配置
   name = "爱看漫";
   key = "ikmmh";
-  version = "1.0.7";
+  version = "1.0.8";
   minAppVersion = "1.0.0";
-  url = "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/ikmmh.js";
+  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/ikmmh.js";
   // 常量定义
   static baseUrl = "https://www.ikmmh.com";
   static Mobile_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1";
@@ -816,8 +820,10 @@ class Ikm extends ComicSource {
 
           let document = new HtmlDocument(res.body);
           let parseComic = (e) => {
-            let title = e.querySelector("div.title").text.split("~")[0];
-            let cover = e.querySelector("div.thumb_img").attributes["data-src"];
+            let title = toStr(e.querySelector("div.title").text).split("~")[0];
+            let cover = toStr(
+              e.querySelector("div.thumb_img").attributes["data-src"]
+            );
             let link = `${Ikm.baseUrl}${
               e.querySelector("a").attributes["href"]
             }`;
@@ -942,10 +948,10 @@ class Ikm extends ComicSource {
 
           let document = new HtmlDocument(res.body);
           let comics = document.querySelectorAll("li.comic-item").map((e) => ({
-            title: e.querySelector("p.title").text.split("~")[0],
-            cover: e.querySelector("img").attributes["src"],
+            title: toStr(e.querySelector("p.title").text).split("~")[0],
+            cover: toStr(e.querySelector("img").attributes["src"]),
             id: `${Ikm.baseUrl}${e.querySelector("a").attributes["href"]}`,
-            subTitle: e.querySelector("span.chapter").text,
+            subTitle: toStr(e.querySelector("span.chapter").text),
           }));
           return {
             comics,
@@ -973,11 +979,11 @@ class Ikm extends ComicSource {
           return {
             comics: resData.data.map((e) => ({
               id: `${Ikm.baseUrl}${e.info_url}`,
-              title: e.name.split("~")[0],
-              subTitle: e.author,
-              cover: e.cover,
-              tags: Array.isArray(e.tags) ? e.tags : [],
-              description: e.lastchapter,
+              title: toStr(e.name).split("~")[0],
+              subTitle: toStr(e.author),
+              cover: toStr(e.cover),
+              tags: toStrList(e.tags),
+              description: toStr(e.lastchapter),
             })),
             maxPage: resData.end || 1,
           };
@@ -1043,10 +1049,10 @@ class Ikm extends ComicSource {
         let document = new HtmlDocument(res.body);
         return {
           comics: document.querySelectorAll("li.comic-item").map((e) => ({
-            title: e.querySelector("p.title").text.split("~")[0],
-            cover: e.querySelector("img").attributes["src"],
+            title: toStr(e.querySelector("p.title").text).split("~")[0],
+            cover: toStr(e.querySelector("img").attributes["src"]),
             id: `${Ikm.baseUrl}${e.querySelector("a").attributes["href"]}`,
-            subTitle: e.querySelector("span.chapter").text,
+            subTitle: toStr(e.querySelector("span.chapter").text),
           })),
           maxPage: 1,
         };
@@ -1123,9 +1129,9 @@ class Ikm extends ComicSource {
       let document = new HtmlDocument(res.body);
       return {
         comics: document.querySelectorAll("div.bookrack-item").map((e) => ({
-          title: e.querySelector("h3").text.split("~")[0],
-          subTitle: e.querySelector("p.desc").text,
-          cover: e.querySelector("img").attributes["src"],
+          title: toStr(e.querySelector("h3").text).split("~")[0],
+          subTitle: toStr(e.querySelector("p.desc").text),
+          cover: toStr(e.querySelector("img").attributes["src"]),
           id: `${Ikm.baseUrl}/book/${e.attributes["data-id"]}/`,
         })),
         maxPage: 1,
@@ -1190,16 +1196,18 @@ class Ikm extends ComicSource {
       let intro = desc?.[1]?.trim().replace(/\s+/g, " ") || "";
 
       return {
-        title: title.split("~")[0],
-        cover: thumb,
-        description: intro,
+        title: toStr(title).split("~")[0],
+        cover: toStr(thumb),
+        description: toStr(intro),
         tags: {
           "作者": [
-            document
-              .querySelector("div.book-container__author")
-              .text.split("作者：")[1],
+            toStr(
+              document
+                .querySelector("div.book-container__author")
+                .text.split("作者：")[1]
+            ),
           ],
-          "更新": [document.querySelector("div.update > a > em").text],
+          "更新": [toStr(document.querySelector("div.update > a > em").text)],
           "标签": document
             .querySelectorAll("div.book-hero__detail > div.tags > a")
             .map((e) => e.text.trim())
@@ -1209,8 +1217,8 @@ class Ikm extends ComicSource {
         recommend: document
           .querySelectorAll("div.module-guessu > div.item")
           .map((e) => ({
-            title: e.querySelector("div.title").text.split("~")[0],
-            cover: e.querySelector("div.thumb_img").attributes["data-src"],
+            title: toStr(e.querySelector("div.title").text).split("~")[0],
+            cover: toStr(e.querySelector("div.thumb_img").attributes["data-src"]),
             id: `${Ikm.baseUrl}${e.querySelector("a").attributes["href"]}`,
           })),
         isFavorite: isFavorite,
