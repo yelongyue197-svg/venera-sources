@@ -207,5 +207,12 @@
     "key": "dm5",
     "version": "1.0.5",
     "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.5/dm5.js"
+  },
+  {
+    "name": "WeebCentral",
+    "fileName": "weebcentral.js",
+    "key": "weebcentral",
+    "version": "1.0.0",
+    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/weebcentral.js"
   }
 ]
