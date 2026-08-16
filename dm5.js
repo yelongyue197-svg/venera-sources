@@ -3,9 +3,9 @@ class DongManWu extends ComicSource {
   // 动漫屋：国内可直连、日漫资源全；章节图片走 chapterfun.ashx（eval 打包 JS，需解包）
   name = "动漫屋";
   key = "dm5";
-  version = "1.0.1";
+  version = "1.0.2";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/dm5.js";
+  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/dm5.js";
   api = "https://www.dm5.com";
 
   init() {
