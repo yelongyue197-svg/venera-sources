@@ -3,9 +3,9 @@ class LiuManHua extends ComicSource {
   // 六漫画（MCCMS）：国内可直连，章节图片为 AES-128-CBC 加密，解密后得到图片列表
   name = "六漫画";
   key = "liumanhua";
-  version = "1.0.1";
+  version = "1.0.2";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/liumanhua.js";
+  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/liumanhua.js";
   api = "https://www.liumanhua.com";
   mobile = "https://m.liumanhua.com";
 
