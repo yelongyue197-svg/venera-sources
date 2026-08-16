@@ -3,7 +3,7 @@ class DongManWu extends ComicSource {
   // 动漫屋：国内可直连、日漫资源全；章节图片走 chapterfun.ashx（eval 打包 JS，需解包）
   name = "动漫屋";
   key = "dm5";
-  version = "1.0.0";
+  version = "1.0.1";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/dm5.js";
   api = "https://www.dm5.com";
@@ -37,6 +37,19 @@ class DongManWu extends ComicSource {
 
   _strip(s) {
     return (s || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  }
+
+  _sortedChapters(entries) {
+    const num = (name, key) => {
+      const m1 = String(name).match(/第\s*(\d+)/);
+      if (m1) return parseInt(m1[1], 10);
+      const m2 = String(key).match(/(\d+)/);
+      return m2 ? parseInt(m2[1], 10) : 0;
+    };
+    return entries
+      .map((e, i) => ({ e, i, n: num(e[1], e[0]) }))
+      .sort((a, b) => (a.n - b.n) || (a.i - b.i))
+      .map((x) => x.e);
   }
 
   // Dean Edwards packer 解包
@@ -155,18 +168,21 @@ class DongManWu extends ComicSource {
       const chapters = new Map();
       const blockRe = /<ul class="view-win-list detail-list-select" id="detail-list-select-\d+">([\s\S]*?)<\/ul>/g;
       let bm;
+      const entries = [];
       while ((bm = blockRe.exec(html)) !== null) {
         const chRe = /href="\/m(\d+)\/"[^>]*>\s*([\s\S]*?)<\/a>/g;
         let cm;
         while ((cm = chRe.exec(bm[1])) !== null) {
           const name = this._strip(cm[2]);
-          if (name && !chapters.has(cm[1])) chapters.set(cm[1], name);
+          if (name) entries.push([cm[1], name]);
         }
       }
+      for (const [cid, name] of this._sortedChapters(entries)) chapters.set(cid, name);
       return new ComicDetails({
         title: titleM ? this._strip(titleM[1]) : id,
         cover: coverM ? this._abs(coverM[1], this.api) : "",
         chapters,
+        tags: {},
         description: descM ? this._strip(descM[1]) : "",
       });
     },
