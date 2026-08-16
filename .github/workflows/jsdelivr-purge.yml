@@ -1,0 +1,20 @@
+name: Purge jsDelivr cache
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge jsDelivr cache
+        env:
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+        run: |
+          curl -sS --fail-with-body -X POST "https://purge.jsdelivr.net/" \
+            -H "Content-Type: application/json" \
+            --data "{\"path\":[\"/gh/${REPO}@${REF}/index.json\",\"/gh/${REPO}@${REF}/weebcentral.js\"]}"
