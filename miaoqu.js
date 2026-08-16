@@ -3,7 +3,7 @@ class MiaoQu extends ComicSource {
   // 妙趣漫画（MCCMS）：国内可直连，移动端页面服务端渲染，章节图片为 XOR+Base64 加密
   name = "妙趣漫画";
   key = "miaoqu";
-  version = "1.0.7";
+  version = "1.0.8";
   minAppVersion = "1.4.0";
   url = "https://yelongyue197-svg.github.io/venera-sources/miaoqu.js";
   api = "https://www.miaoqumh.org";
@@ -133,6 +133,98 @@ class MiaoQu extends ComicSource {
     return chapters;
   }
 
+  // 纯 JS 实现，避免个别环境下应用 Convert 桥接异常导致解密失败
+  _b64ToBytes(s) {
+    const t = String(s || "").replace(/\s+/g, "");
+    const lookup =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const out = [];
+    let buffer = 0;
+    let bits = 0;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (c === "=") break;
+      const v = lookup.indexOf(c);
+      if (v < 0) continue;
+      buffer = (buffer << 6) | v;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        out.push((buffer >> bits) & 0xff);
+      }
+    }
+    return new Uint8Array(out);
+  }
+
+  _latin1(bytes) {
+    let out = "";
+    for (let i = 0; i < bytes.length; i++) out += String.fromCharCode(bytes[i]);
+    return out;
+  }
+
+  _bytesToUtf8(bytes) {
+    let out = "";
+    let i = 0;
+    while (i < bytes.length) {
+      const b0 = bytes[i];
+      if (b0 < 0x80) {
+        out += String.fromCharCode(b0);
+        i++;
+      } else if (b0 >= 0xc0 && b0 < 0xe0 && i + 1 < bytes.length) {
+        out += String.fromCharCode(((b0 & 0x1f) << 6) | (bytes[i + 1] & 0x3f));
+        i += 2;
+      } else if (b0 >= 0xe0 && b0 < 0xf0 && i + 2 < bytes.length) {
+        out += String.fromCharCode(
+          ((b0 & 0x0f) << 12) |
+            ((bytes[i + 1] & 0x3f) << 6) |
+            (bytes[i + 2] & 0x3f)
+        );
+        i += 3;
+      } else if (b0 >= 0xf0 && i + 3 < bytes.length) {
+        const cp =
+          ((b0 & 0x07) << 18) |
+          ((bytes[i + 1] & 0x3f) << 12) |
+          ((bytes[i + 2] & 0x3f) << 6) |
+          (bytes[i + 3] & 0x3f);
+        out += String.fromCharCode(
+          0xd800 + ((cp - 0x10000) >> 10),
+          0xdc00 + ((cp - 0x10000) & 0x3ff)
+        );
+        i += 4;
+      } else {
+        out += String.fromCharCode(b0);
+        i++;
+      }
+    }
+    return out;
+  }
+
+  _xorDecrypt(data, cid) {
+    // 返回图片列表；失败返回 null
+    const raw = this._b64ToBytes(data);
+    if (raw.length === 0) return null;
+    for (let ki = 0; ki < this.decryptKeys.length; ki++) {
+      const key = this.decryptKeys[(cid + ki) % this.decryptKeys.length];
+      try {
+        const bytes = new Uint8Array(raw);
+        const kb = new Uint8Array(key.length);
+        for (let i = 0; i < key.length; i++) kb[i] = key.charCodeAt(i) & 0xff;
+        for (let i = 0; i < bytes.length; i++) bytes[i] ^= kb[i & 7];
+        const b64Json = this._latin1(bytes);
+        const jsonBytes = this._b64ToBytes(b64Json);
+        const json = this._bytesToUtf8(jsonBytes);
+        const list = JSON.parse(json);
+        const cand = Array.isArray(list)
+          ? list.map((x) => (typeof x === "string" ? x : x && x.url)).filter(Boolean)
+          : [];
+        if (cand.length) return cand;
+      } catch (e) {
+        // 继续尝试下一个 key
+      }
+    }
+    return null;
+  }
+
   _siteDecrypt(html, data, cid) {
     // 直接执行站点自身的 pic.js 解密函数，key 表轮换也不受影响
     return (async () => {
@@ -147,14 +239,15 @@ class MiaoQu extends ComicSource {
       // 提供站点脚本运行所需的最小环境
       const g = typeof globalThis !== "undefined" ? globalThis : this;
       if (!g.atob) {
-        const latin1 = (s) => {
-          const b = Convert.decodeBase64(s || "");
-          let out = "";
-          for (let i = 0; i < b.length; i++) out += String.fromCharCode(b[i]);
-          return out;
+        const dec = (s) => this._latin1(this._b64ToBytes(s));
+        g.atob = dec;
+        g.Base64 = {
+          decode: dec,
+          encode: (s) => {
+            // 站点脚本仅需要 decode
+            return s;
+          },
         };
-        g.atob = latin1;
-        g.Base64 = { decode: latin1, encode: (s) => Convert.encodeBase64(Convert.encodeUtf8(s)) };
         g.$ = () => ({ length: 0, eq: () => ({ on: () => {} }), on: () => {}, append: () => {}, hide: () => {}, show: () => {} });
         g.window = { innerHeight: 900 };
         g.document = {
@@ -293,34 +386,9 @@ class MiaoQu extends ComicSource {
         found = await tryPage(`${this.mobile}/${cid}/${chid}.html`, `${this.mobile}/${cid}`, true);
       }
       if (!data) throw "章节图片数据缺失（DATA）";
-      // 站点偶发更换 key 表映射：依次尝试全部 key，直到解出合法图片列表
-      let images = [];
-      let lastErr = "";
-      for (let ki = 0; ki < this.decryptKeys.length; ki++) {
-        const key = this.decryptKeys[(decryptCid + ki) % this.decryptKeys.length];
-        try {
-          const bytes = new Uint8Array(Convert.decodeBase64(data));
-          const keyBytes = new Uint8Array(Convert.encodeUtf8(key));
-          for (let i = 0; i < bytes.length; i++) {
-            bytes[i] ^= keyBytes[i & 7];
-          }
-          const b64Json = Convert.decodeUtf8(bytes);
-          if (b64Json == null) throw "utf8 解码失败";
-          const jsonBytes = Convert.decodeBase64(b64Json);
-          const json = Convert.decodeUtf8(jsonBytes);
-          if (json == null) throw "utf8 解码失败";
-          const list = JSON.parse(json);
-          const cand = Array.isArray(list)
-            ? list.map((x) => (typeof x === "string" ? x : x && x.url)).filter(Boolean)
-            : [];
-          if (cand.length) {
-            images = cand;
-            break;
-          }
-        } catch (e) {
-          lastErr = e && e.message ? e.message : String(e);
-        }
-      }
+      // 站点偶发更换 key 表映射：纯 JS 依次尝试全部 key，直到解出合法图片列表
+      let images = this._xorDecrypt(data, decryptCid) || [];
+      let lastErr = images.length ? "" : "纯 JS 解密无结果";
       if (images.length === 0) {
         // 硬编码 key 全部失败：调用站点原生解密脚本（兼容 key 表轮换）
         let siteErr = "";
