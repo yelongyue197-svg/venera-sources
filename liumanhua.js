@@ -3,7 +3,7 @@ class LiuManHua extends ComicSource {
   // 六漫画（MCCMS）：国内可直连，章节图片为 AES-128-CBC 加密，解密后得到图片列表
   name = "六漫画";
   key = "liumanhua";
-  version = "1.0.3";
+  version = "1.0.4";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/liumanhua.js";
   api = "https://www.liumanhua.com";
@@ -202,7 +202,7 @@ class LiuManHua extends ComicSource {
       const ct = raw.slice(16);
       const key = new Uint8Array(Convert.encodeUtf8("9S8$vJnU2ANeSRoF"));
       // 直接走引擎的 AES-CBC（Convert.decryptAesCbc 在部分版本中类型有误，改用 sendMessage）
-      const dec = sendMessage({
+      let dec = sendMessage({
         method: "convert",
         type: "aes-cbc",
         value: ct,
@@ -210,7 +210,24 @@ class LiuManHua extends ComicSource {
         iv: iv,
         isEncode: false,
       });
-      const jsonText = Convert.decodeUtf8(dec);
+      if (dec == null) throw "章节图片数据解密失败";
+      // VeneraNext 的 aes-cbc 不做 PKCS7 去填充，手动去除尾部填充再解析
+      let decBytes = new Uint8Array(dec);
+      if (decBytes.length > 0) {
+        const pad = decBytes[decBytes.length - 1];
+        if (pad >= 1 && pad <= 16 && pad <= decBytes.length) {
+          let valid = true;
+          for (let i = decBytes.length - pad; i < decBytes.length; i++) {
+            if (decBytes[i] !== pad) {
+              valid = false;
+              break;
+            }
+          }
+          if (valid) decBytes = decBytes.slice(0, decBytes.length - pad);
+        }
+      }
+      const jsonText = Convert.decodeUtf8(decBytes);
+      if (jsonText == null) throw "章节图片数据解密失败";
       const obj = JSON.parse(jsonText);
       const images = Array.isArray(obj.images) ? obj.images : Array.isArray(obj) ? obj : [];
       if (images.length === 0) throw "章节图片解密结果为空";
