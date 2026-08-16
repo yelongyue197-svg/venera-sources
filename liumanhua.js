@@ -3,7 +3,7 @@ class LiuManHua extends ComicSource {
   // 六漫画（MCCMS）：国内可直连，章节图片为 AES-128-CBC 加密，解密后得到图片列表
   name = "六漫画";
   key = "liumanhua";
-  version = "1.0.0";
+  version = "1.0.1";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/liumanhua.js";
   api = "https://www.liumanhua.com";
@@ -42,6 +42,19 @@ class LiuManHua extends ComicSource {
     if (/^https?:/i.test(u)) return u;
     if (u.startsWith("//")) return "https:" + u;
     return base.replace(/\/+$/, "") + "/" + u.replace(/^\/+/, "");
+  }
+
+  _sortedChapters(entries) {
+    const num = (name, key) => {
+      const m1 = String(name).match(/第\s*(\d+)/);
+      if (m1) return parseInt(m1[1], 10);
+      const m2 = String(key).match(/(\d+)/);
+      return m2 ? parseInt(m2[1], 10) : 0;
+    };
+    return entries
+      .map((e, i) => ({ e, i, n: num(e[1], e[0]) }))
+      .sort((a, b) => (a.n - b.n) || (a.i - b.i))
+      .map((x) => x.e);
   }
 
   _parseList(html) {
@@ -137,15 +150,18 @@ class LiuManHua extends ComicSource {
       const chapters = new Map();
       const chRe = /href="(\/\d+\/(\d+)\.html)"[^>]*>([\s\S]*?)<\/a>/g;
       let m;
+      const entries = [];
       while ((m = chRe.exec(html)) !== null) {
         const chid = m[2];
         const name = m[3].replace(/<[^>]+>/g, "").trim();
-        if (name && name !== "在线阅读" && !chapters.has(chid)) chapters.set(chid, name);
+        if (name && name !== "在线阅读") entries.push([chid, name]);
       }
+      for (const [chid, name] of this._sortedChapters(entries)) chapters.set(chid, name);
       return new ComicDetails({
         title: titleM ? titleM[1].replace(/<[^>]+>/g, "").trim() : `漫画${id}`,
         cover: coverM ? this._abs(coverM[1] || coverM[2] || "", this.api) : "",
         chapters,
+        tags: {},
         description: descM ? descM[1].replace(/<[^>]+>/g, "").trim() : "",
       });
     },
