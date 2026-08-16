@@ -3,9 +3,9 @@ class MiaoQu extends ComicSource {
   // 妙趣漫画（MCCMS）：国内可直连，移动端页面服务端渲染，章节图片为 XOR+Base64 加密
   name = "妙趣漫画";
   key = "miaoqu";
-  version = "1.0.6";
+  version = "1.0.7";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.6/miaoqu.js";
+  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.7/miaoqu.js";
   api = "https://www.miaoqumh.org";
   mobile = "https://m.miaoqumh.org";
 
@@ -165,12 +165,17 @@ class MiaoQu extends ComicSource {
         };
         g.Image = function () { this.src = ""; this.onload = null; };
       }
-      const fn = new Function(
-        "DATA",
-        "cid",
-        js + "\n;return (typeof newImgs !== 'undefined' && newImgs) ? newImgs : null;"
-      );
-      const list = fn(data, cid);
+      const body = js + "\n;return (typeof newImgs !== 'undefined' && newImgs) ? newImgs : null;";
+      let list = null;
+      try {
+        const fn = new Function("DATA", "cid", body);
+        list = fn(data, cid);
+      } catch (e1) {
+        // 个别引擎不支持 new Function 时，用 eval 包裹执行
+        list = eval(
+          "(function(){ var DATA=" + JSON.stringify(data) + "; var cid=" + cid + "; " + body + " })()"
+        );
+      }
       return Array.isArray(list)
         ? list.map((x) => (typeof x === "string" ? x : x && x.url)).filter(Boolean)
         : [];
@@ -318,14 +323,18 @@ class MiaoQu extends ComicSource {
       }
       if (images.length === 0) {
         // 硬编码 key 全部失败：调用站点原生解密脚本（兼容 key 表轮换）
+        let siteErr = "";
         try {
           images = await this._siteDecrypt(pageHtml, data, decryptCid);
         } catch (e) {
-          log("warning", this.name, "站点原生解密失败：" + (e && e.message ? e.message : String(e)));
+          siteErr = e && e.message ? e.message : String(e);
+          log("warning", this.name, "站点原生解密失败：" + siteErr);
         }
-      }
-      if (images.length === 0) {
-        throw "章节图片解密结果为空" + (lastErr ? "（" + lastErr + "）" : "");
+        if (images.length === 0) {
+          throw "章节图片解密结果为空" +
+            (lastErr ? "（" + lastErr + "）" : "") +
+            (siteErr ? "【站点解密：" + siteErr + "】" : "");
+        }
       }
       if (lastErr) log("warning", this.name, "解密兜底：" + lastErr);
       // 原图源 s2.bzcdn.net 在部分网络下不可达，替换为可达的 baozimh 静态域名（路径一致）
