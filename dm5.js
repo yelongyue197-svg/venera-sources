@@ -3,7 +3,7 @@ class DongManWu extends ComicSource {
   // 动漫屋：国内可直连、日漫资源全；章节图片走 chapterfun.ashx（eval 打包 JS，需解包）
   name = "动漫屋";
   key = "dm5";
-  version = "1.0.2";
+  version = "1.0.5";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/dm5.js";
   api = "https://www.dm5.com";
@@ -157,21 +157,26 @@ class DongManWu extends ComicSource {
   };
 
   comic = {
-    loadInfo: async (id) => {
-      const url = this._abs(id, this.api);
-      const html = await this.fetchText(url, this.api + "/");
-      const titleM =
-        html.match(/<div class="banner_detail_form">[\s\S]*?<p class="title">\s*([^<]+)/i) ||
-        html.match(/<p class="title">\s*([^<]+)/i);
-      const coverM = html.match(/<div class="cover">\s*<img[^>]+src="([^"]+)"/i);
-      const descM = html.match(/<p class="intro">\s*([\s\S]*?)<\/p>/i);
-      const chapters = new Map();
-      const blockRe = /<ul class="view-win-list detail-list-select" id="detail-list-select-\d+">([\s\S]*?)<\/ul>/g;
-      let bm;
-      const entries = [];
-      while ((bm = blockRe.exec(html)) !== null) {
-        const chRe = /href="\/m(\d+)\/"[^>]*>\s*([\s\S]*?)<\/a>/g;
-        let cm;
+  loadInfo: async (id) => {
+    const url = this._abs(id, this.api);
+    const html = await this.fetchText(url, this.api + "/");
+    // 部分漫画已被站点下架，明确提示而不是给出空章节
+    if (/不再提供[^<]*在线阅读|已不再提供/.test(html) && !/<ul class="view-win-list detail-list-select"/.test(html)) {
+      throw "该漫画在动漫屋已下架，无法在线阅读";
+    }
+    const titleM =
+      html.match(/<div class="banner_detail_form">[\s\S]*?<p class="title">\s*([^<]+)/i) ||
+      html.match(/<p class="title">\s*([^<]+)/i);
+    const coverM = html.match(/<div class="cover">\s*<img[^>]+src="([^"]+)"/i);
+    const descM = html.match(/<p class="intro">\s*([\s\S]*?)<\/p>/i);
+    const chapters = new Map();
+    // 兼容带 style 等属性的第二个章节区块（id 如 detail-list-select-3）
+    const blockRe = /<ul class="view-win-list detail-list-select" id="detail-list-select-\d+"[^>]*>([\s\S]*?)<\/ul>/g;
+    let bm;
+    const entries = [];
+    while ((bm = blockRe.exec(html)) !== null) {
+      const chRe = /href="\/m(\d+)\/"[^>]*>\s*([\s\S]*?)<\/a>/g;
+      let cm;
         while ((cm = chRe.exec(bm[1])) !== null) {
           const name = this._strip(cm[2]);
           if (name) entries.push([cm[1], name]);
@@ -188,6 +193,9 @@ class DongManWu extends ComicSource {
     },
 
     loadEp: async (comicId, epId) => {
+      if (epId == null || epId === "" || epId === "null" || epId === "undefined") {
+        throw "章节 ID 缺失：该漫画可能已下架，请从详情页重新选择章节";
+      }
       const chapterUrl = `${this.api}/m${epId}/`;
       const html = await this.fetchText(chapterUrl, this._abs(comicId, this.api));
       // 部分章节图片直接内嵌
