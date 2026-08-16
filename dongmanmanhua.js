@@ -3,7 +3,7 @@ class DongManManHua extends ComicSource {
   // 咚漫（Webtoon 中国官方站）：国内可直连、稳定；章节图片来自官方 CDN
   name = "咚漫";
   key = "dongmanmanhua";
-  version = "1.0.0";
+  version = "1.0.1";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/dongmanmanhua.js";
   api = "https://www.dongmanmanhua.cn";
@@ -39,6 +39,20 @@ class DongManManHua extends ComicSource {
     return (s || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
   }
 
+  _sortedChapters(entries) {
+    const num = (name, key) => {
+      const m1 = String(name).match(/(\d+)/);
+      if (m1) return parseInt(m1[1], 10);
+      const m2 = String(key).match(/episode_no=(\d+)/);
+      if (m2) return parseInt(m2[1], 10);
+      return 0;
+    };
+    return entries
+      .map((e, i) => ({ e, i, n: num(e[1], e[0]) }))
+      .sort((a, b) => (a.n - b.n) || (a.i - b.i))
+      .map((x) => x.e);
+  }
+
   // 列表卡片：<li><a href=".../list?title_no=N" class="daily_card_item ..."><img src=".."><div class="info"><p class="subj">标题</p>...
   _parseList(html) {
     const comics = [];
@@ -46,7 +60,8 @@ class DongManManHua extends ComicSource {
       /<a[^>]+href="([^"]*?list\?title_no=\d+)"[^>]*class="[^"]*"[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"[^>]*>[\s\S]*?<p class="subj">([^<]+)<\/p>/g;
     let m;
     while ((m = re.exec(html)) !== null) {
-      const id = m[1].startsWith("//") ? m[1].replace(/^\/\//, "") : m[1];
+      const raw = m[1];
+      const id = raw.startsWith("//") ? "https:" + raw : raw.startsWith("/") ? this._abs(raw, this.api) : raw;
       const title = (m[3] || "").trim();
       if (!id || !title) continue;
       comics.push(new Comic({ id, title, cover: this._abs(m[2], this.api) }));
@@ -121,21 +136,28 @@ class DongManManHua extends ComicSource {
       const descM = html.match(/<p[^>]*class="summary"[^>]*>([\s\S]*?)<\/p>/i);
       const chapters = new Map();
       let pageHtml = html;
+      const entries = [];
       for (let guard = 0; guard < 10; guard++) {
-        const chRe = /<a[^>]+href="([^"]*viewer[^"]*)"[^>]*>[\s\S]*?(?:<span class="subj">)?\s*<span[^>]*>([^<]+)<\/span>[\s\S]*?<\/a>/g;
+        const chRe = /<a[^>]+href="([^"]*viewer[^"]*)"[^>]*>[\s\S]*?<span class="subj">\s*<span[^>]*>([^<]+)<\/span>[\s\S]*?<\/a>/g;
         let m;
         while ((m = chRe.exec(pageHtml)) !== null) {
           const name = (m[2] || "").trim();
-          if (name && !chapters.has(m[1])) chapters.set(m[1], name);
+          if (name) entries.push([m[1], name]);
         }
         const next = pageHtml.match(/<div class="paginate">[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>/);
         if (!next) break;
-        pageHtml = await this.fetchText(this._abs(next[1], this.api), url);
+        try {
+          pageHtml = await this.fetchText(this._abs(next[1], this.api), url);
+        } catch (e) {
+          break;
+        }
       }
+      for (const [k, name] of this._sortedChapters(entries)) chapters.set(k, name);
       return new ComicDetails({
         title: titleM ? this._strip(titleM[1]) : id,
         cover: coverM ? this._abs(coverM[1].replace(/['"]/g, ""), this.api) : "",
         chapters,
+        tags: {},
         description: descM ? this._strip(descM[1]) : "",
       });
     },
