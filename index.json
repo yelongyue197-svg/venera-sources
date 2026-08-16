@@ -191,8 +191,8 @@
     "name": "妙趣漫画",
     "fileName": "miaoqu.js",
     "key": "miaoqu",
-    "version": "1.0.4",
-    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.4/miaoqu.js"
+    "version": "1.0.6",
+    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.6/miaoqu.js"
   },
   {
     "name": "六漫画",
@@ -213,6 +213,6 @@
     "fileName": "weebcentral.js",
     "key": "weebcentral",
     "version": "1.0.0",
-    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/weebcentral.js"
+    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.1.0/weebcentral.js"
   }
 ]
