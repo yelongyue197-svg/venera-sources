@@ -3,9 +3,9 @@ class MiaoQu extends ComicSource {
   // 妙趣漫画（MCCMS）：国内可直连，移动端页面服务端渲染，章节图片为 XOR+Base64 加密
   name = "妙趣漫画";
   key = "miaoqu";
-  version = "1.0.1";
+  version = "1.0.2";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/miaoqu.js";
+  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/miaoqu.js";
   api = "https://www.miaoqumh.org";
   mobile = "https://m.miaoqumh.org";
 
@@ -193,24 +193,44 @@ class MiaoQu extends ComicSource {
       const chid = parts.length > 1 ? parts[1] : epId;
       const url = `${this.api}/${cid}/${chid}.html`;
       const html = await this.fetchText(url, `${this.api}/${cid}`, false);
-      const dataM = html.match(/var\s+DATA\s*=\s*'([^']+)'/);
+      const dataM =
+        html.match(/var\s+DATA\s*=\s*'([^']+)'/) ||
+        html.match(/var\s+DATA\s*=\s*"([^"]+)"/);
       const cidM = html.match(/var\s+cid=(\d+)/);
       if (!dataM) {
         throw "章节图片数据缺失（DATA）";
       }
       const decryptCid = cidM ? parseInt(cidM[1], 10) : parseInt(chid, 10);
-      const key = this.decryptKeys[decryptCid % 10];
-      const bytes = new Uint8Array(Convert.decodeBase64(dataM[1]));
-      const keyBytes = new Uint8Array(Convert.encodeUtf8(key));
-      for (let i = 0; i < bytes.length; i++) {
-        bytes[i] ^= keyBytes[i & 7];
+      // 站点偶发更换 key 表映射：依次尝试全部 key，直到解出合法图片列表
+      let images = [];
+      let lastErr = "";
+      for (let ki = 0; ki < this.decryptKeys.length; ki++) {
+        const key = this.decryptKeys[(decryptCid + ki) % this.decryptKeys.length];
+        try {
+          const bytes = new Uint8Array(Convert.decodeBase64(dataM[1]));
+          const keyBytes = new Uint8Array(Convert.encodeUtf8(key));
+          for (let i = 0; i < bytes.length; i++) {
+            bytes[i] ^= keyBytes[i & 7];
+          }
+          const b64Json = Convert.decodeUtf8(bytes);
+          if (b64Json == null) throw "utf8 解码失败";
+          const jsonBytes = Convert.decodeBase64(b64Json);
+          const json = Convert.decodeUtf8(jsonBytes);
+          if (json == null) throw "utf8 解码失败";
+          const list = JSON.parse(json);
+          const cand = Array.isArray(list)
+            ? list.map((x) => (typeof x === "string" ? x : x && x.url)).filter(Boolean)
+            : [];
+          if (cand.length) {
+            images = cand;
+            break;
+          }
+        } catch (e) {
+          lastErr = e && e.message ? e.message : String(e);
+        }
       }
-      const b64Json = Convert.decodeUtf8(bytes);
-      const jsonBytes = Convert.decodeBase64(b64Json);
-      const json = Convert.decodeUtf8(jsonBytes);
-      const list = JSON.parse(json);
-      const images = Array.isArray(list) ? list.map((x) => (typeof x === "string" ? x : x.url)).filter(Boolean) : [];
       if (images.length === 0) throw "章节图片解密结果为空";
+      if (lastErr) log("warning", this.name, "解密兜底：" + lastErr);
       // 原图源 s2.bzcdn.net 在部分网络下不可达，替换为可达的 baozimh 静态域名（路径一致）
       return { images: images.map((u) => u.replace(/^https?:\/\/s2\.bzcdn\.net\//i, "https://static-tw.baozimh.com/")) };
     },
