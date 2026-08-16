@@ -3,7 +3,7 @@ class MiaoQu extends ComicSource {
   // 妙趣漫画（MCCMS）：国内可直连，移动端页面服务端渲染，章节图片为 XOR+Base64 加密
   name = "妙趣漫画";
   key = "miaoqu";
-  version = "1.0.2";
+  version = "1.0.3";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/miaoqu.js";
   api = "https://www.miaoqumh.org";
@@ -28,11 +28,18 @@ class MiaoQu extends ComicSource {
     };
     this.fetchText = async (url, referer, mobile) => {
       const headers = mobile ? this.mobileHeaders : this.desktopHeaders;
-      const resp = await Network.get(url, { ...headers, Referer: referer || this.api + "/" });
-      if (resp.status !== 200) {
-        throw `HTTP ${resp.status}: ${url}`;
+      let lastErr = "";
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const resp = await Network.get(url, { ...headers, Referer: referer || this.api + "/" });
+          if (resp.status === 200) return resp.body;
+          lastErr = `HTTP ${resp.status}: ${url}`;
+        } catch (e) {
+          lastErr = e && e.message ? e.message : String(e);
+        }
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 600));
       }
-      return resp.body;
+      throw lastErr || `请求失败：${url}`;
     };
     // 章节图片解密 key 表（由站点 JS 固定，cid 为章节 id）
     this.decryptKeys = [
@@ -110,6 +117,22 @@ class MiaoQu extends ComicSource {
     return comics.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
   }
 
+  _parseChapters(html) {
+    const chapters = new Map();
+    const chRe = /href="(\/\d+\/(\d+)\.html)"[^>]*>([\s\S]*?)<\/a>/g;
+    let m;
+    const entries = [];
+    while ((m = chRe.exec(html)) !== null) {
+      const key = m[1].replace(/^\//, "").replace(/\.html$/, "");
+      const name = m[3].replace(/<[^>]+>/g, "").trim();
+      if (name && !["开始阅读", "继续阅读下一章节", "下一章"].includes(name)) {
+        entries.push([key, name]);
+      }
+    }
+    for (const [key, name] of this._sortedChapters(entries)) chapters.set(key, name);
+    return chapters;
+  }
+
   explore = [
     {
       title: this.name,
@@ -159,24 +182,24 @@ class MiaoQu extends ComicSource {
 
   comic = {
     loadInfo: async (id) => {
-      const url = `${this.api}/${id}`;
-      const html = await this.fetchText(url, this.api + "/", false);
+      let html = "";
+      try {
+        html = await this.fetchText(`${this.api}/${id}`, this.api + "/", false);
+      } catch (e) {
+        html = await this.fetchText(`${this.mobile}/${id}`, this.api + "/", true);
+      }
       const titleM = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
       const coverM =
         html.match(/<div class="manga-img[^"]*"[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"/i) ||
         html.match(/<img[^>]+src="([^"]+)"[^>]*class="[^"]*cover[^"]*"/i);
       const descM = html.match(/<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-      const chapters = new Map();
       // 章节链接形如 /<漫画数字id>/<章节id>.html；key 存为 "漫画id/章节id" 便于 loadEp 直接拼 URL
-      const chRe = /href="(\/\d+\/(\d+)\.html)"[^>]*>([\s\S]*?)<\/a>/g;
-      let m;
-      const entries = [];
-      while ((m = chRe.exec(html)) !== null) {
-        const key = `${m[1].replace(/^\//, "").replace(/\.html$/, "")}`;
-        const name = m[3].replace(/<[^>]+>/g, "").trim();
-        if (name && name !== "开始阅读") entries.push([key, name]);
+      let chapters = this._parseChapters(html);
+      if (chapters.size === 0) {
+        // 桌面页解析为空（可能被反爬拦截）时尝试移动端详情页
+        const mhtml = await this.fetchText(`${this.mobile}/${id}`, this.api + "/", true);
+        chapters = this._parseChapters(mhtml);
       }
-      for (const [key, name] of this._sortedChapters(entries)) chapters.set(key, name);
       return new ComicDetails({
         title: titleM ? titleM[1].replace(/<[^>]+>/g, "").trim() : id,
         cover: coverM ? this._abs(coverM[1] || "", this.api) : "",
@@ -191,23 +214,36 @@ class MiaoQu extends ComicSource {
       const parts = epId.split("/");
       const cid = parts.length > 1 ? parts[0] : comicId;
       const chid = parts.length > 1 ? parts[1] : epId;
-      const url = `${this.api}/${cid}/${chid}.html`;
-      const html = await this.fetchText(url, `${this.api}/${cid}`, false);
-      const dataM =
-        html.match(/var\s+DATA\s*=\s*'([^']+)'/) ||
-        html.match(/var\s+DATA\s*=\s*"([^"]+)"/);
-      const cidM = html.match(/var\s+cid=(\d+)/);
-      if (!dataM) {
-        throw "章节图片数据缺失（DATA）";
+      let data = null;
+      let decryptCid = parseInt(chid, 10);
+      const tryPage = async (url, referer, mobile) => {
+        const page = await this.fetchText(url, referer, mobile);
+        const d = page.match(/var\s+DATA\s*=\s*'([^']+)'/) || page.match(/var\s+DATA\s*=\s*"([^"]+)"/);
+        const c = page.match(/var\s+cid=(\d+)/);
+        if (d) {
+          data = d[1];
+          if (c) decryptCid = parseInt(c[1], 10);
+          return true;
+        }
+        return false;
+      };
+      let found = false;
+      try {
+        found = await tryPage(`${this.api}/${cid}/${chid}.html`, `${this.api}/${cid}`, false);
+      } catch (e) {
+        found = false;
       }
-      const decryptCid = cidM ? parseInt(cidM[1], 10) : parseInt(chid, 10);
+      if (!found) {
+        found = await tryPage(`${this.mobile}/${cid}/${chid}.html`, `${this.mobile}/${cid}`, true);
+      }
+      if (!data) throw "章节图片数据缺失（DATA）";
       // 站点偶发更换 key 表映射：依次尝试全部 key，直到解出合法图片列表
       let images = [];
       let lastErr = "";
       for (let ki = 0; ki < this.decryptKeys.length; ki++) {
         const key = this.decryptKeys[(decryptCid + ki) % this.decryptKeys.length];
         try {
-          const bytes = new Uint8Array(Convert.decodeBase64(dataM[1]));
+          const bytes = new Uint8Array(Convert.decodeBase64(data));
           const keyBytes = new Uint8Array(Convert.encodeUtf8(key));
           for (let i = 0; i < bytes.length; i++) {
             bytes[i] ^= keyBytes[i & 7];
