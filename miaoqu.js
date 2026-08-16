@@ -3,7 +3,7 @@ class MiaoQu extends ComicSource {
   // 妙趣漫画（MCCMS）：国内可直连，移动端页面服务端渲染，章节图片为 XOR+Base64 加密
   name = "妙趣漫画";
   key = "miaoqu";
-  version = "1.0.3";
+  version = "1.0.4";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/miaoqu.js";
   api = "https://www.miaoqumh.org";
@@ -138,7 +138,12 @@ class MiaoQu extends ComicSource {
       title: this.name,
       type: "singlePageWithMultiPart",
       load: async () => {
-        const html = await this.fetchText(this.mobile + "/", this.api + "/", true);
+        let html = "";
+        try {
+          html = await this.fetchText(this.mobile + "/", this.api + "/", true);
+        } catch (e) {
+          html = await this.fetchText(this.api + "/", this.api + "/", false);
+        }
         const list = this._parseList(html);
         const result = {};
         if (list.length) result["推荐"] = list.slice(0, 20);
