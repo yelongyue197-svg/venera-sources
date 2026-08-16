@@ -3,9 +3,9 @@ class DongManManHua extends ComicSource {
   // 咚漫（Webtoon 中国官方站）：国内可直连、稳定；章节图片来自官方 CDN
   name = "咚漫";
   key = "dongmanmanhua";
-  version = "1.0.1";
+  version = "1.0.2";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/dongmanmanhua.js";
+  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/dongmanmanhua.js";
   api = "https://www.dongmanmanhua.cn";
 
   init() {
