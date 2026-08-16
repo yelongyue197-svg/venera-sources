@@ -3,7 +3,7 @@ class LiuManHua extends ComicSource {
   // 六漫画（MCCMS）：国内可直连，章节图片为 AES-128-CBC 加密，解密后得到图片列表
   name = "六漫画";
   key = "liumanhua";
-  version = "1.0.6";
+  version = "1.0.7";
   minAppVersion = "1.4.0";
   url = "https://yelongyue197-svg.github.io/venera-sources/liumanhua.js";
   api = "https://www.liumanhua.com";
@@ -71,6 +71,17 @@ class LiuManHua extends ComicSource {
     return n;
   }
 
+  _normName(name) {
+    const s = String(name).trim();
+    // "第N话 X" / "第N回 X" / "第N章 X" / "第N集 X" → X
+    let m = s.match(/^第\s*\d+\s*(?:话|回|章|集)\s*(.*)$/);
+    if (m && m[1] && m[1].trim()) return m[1].trim();
+    // "N X" / "NNN·X" / "总N X" / "00N·X" → X
+    m = s.match(/^总?\d{1,6}\s*[·.\-、]?\s*(.*)$/);
+    if (m && m[1] && m[1].trim()) return m[1].trim();
+    return s;
+  }
+
   _parseList(html) {
     const comics = [];
     // 桌面端列表：<li><a href="/id" class="pic"><img src=".."></a></li><li class="title"><a href="/id">标题</a></li>
@@ -123,8 +134,16 @@ class LiuManHua extends ComicSource {
       if (!prev || it.n < prev.n) best.set(it.id, it);
     }
     const sorted = [...best.values()].sort((a, b) => (a.n - b.n) || (a.idx - b.idx));
+    // 站点偶发把同一章节列出两遍（不同 id、同名或仅编号写法不同）：
+    // 用"章节号 + 归一化标题"双键去重，只保留第一条，避免误删编号不同的同标题章节
+    const seenNames = new Set();
     const chapters = new Map();
-    for (const it of sorted) chapters.set(it.id, it.name);
+    for (const it of sorted) {
+      const key = Math.floor(it.n) + "|" + this._normName(it.name);
+      if (seenNames.has(key)) continue;
+      seenNames.add(key);
+      chapters.set(it.id, it.name);
+    }
     return chapters;
   }
 
