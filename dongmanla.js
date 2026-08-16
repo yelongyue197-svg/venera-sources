@@ -3,9 +3,9 @@ class DongManLa extends ComicSource {
   // 动漫啦（原盒子漫画）：国内可直连、无广告、图片直链
   name = "动漫啦";
   key = "dongmanla";
-  version = "1.0.1";
+  version = "1.0.2";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/dongmanla.js";
+  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/dongmanla.js";
   api = "https://www.dongman.la";
 
   init() {
