@@ -172,5 +172,35 @@
     "fileName": "zaimanhua.js",
     "key": "zaimanhua",
     "version": "1.0.2"
+  },
+  {
+    "name": "动漫啦",
+    "fileName": "dongmanla.js",
+    "key": "dongmanla",
+    "version": "1.0.0"
+  },
+  {
+    "name": "咚漫",
+    "fileName": "dongmanmanhua.js",
+    "key": "dongmanmanhua",
+    "version": "1.0.0"
+  },
+  {
+    "name": "妙趣漫画",
+    "fileName": "miaoqu.js",
+    "key": "miaoqu",
+    "version": "1.0.0"
+  },
+  {
+    "name": "六漫画",
+    "fileName": "liumanhua.js",
+    "key": "liumanhua",
+    "version": "1.0.0"
+  },
+  {
+    "name": "动漫屋",
+    "fileName": "dm5.js",
+    "key": "dm5",
+    "version": "1.0.0"
   }
 ]
