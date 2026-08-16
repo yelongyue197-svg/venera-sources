@@ -3,7 +3,7 @@ class DongManLa extends ComicSource {
   // 动漫啦（原盒子漫画）：国内可直连、无广告、图片直链
   name = "动漫啦";
   key = "dongmanla";
-  version = "1.0.0";
+  version = "1.0.1";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/dongmanla.js";
   api = "https://www.dongman.la";
@@ -92,6 +92,21 @@ class DongManLa extends ComicSource {
       }
     }
     return [...map.values()];
+  }
+
+  _sortedChapters(entries) {
+    const num = (name, key) => {
+      const m1 = String(name).match(/第\s*(\d+)/);
+      if (m1) return parseInt(m1[1], 10);
+      const m2 = String(key).match(/\/chapter\/\d+\/(\d+)\//);
+      if (m2) return parseInt(m2[1], 10);
+      const m3 = String(key).match(/(\d+)/);
+      return m3 ? parseInt(m3[1], 10) : 0;
+    };
+    return entries
+      .map((e, i) => ({ e, i, n: num(e[1], e[0]) }))
+      .sort((a, b) => (a.n - b.n) || (a.i - b.i))
+      .map((x) => x.e);
   }
 
   explore = [
@@ -184,11 +199,13 @@ class DongManLa extends ComicSource {
       const chapters = new Map();
       const chRe = /\/manhua\/chapter\/\d+\/(\d+)\/['"][^>]*title="([^"]+)"/g;
       let ch;
+      const entries = [];
       while ((ch = chRe.exec(html))) {
         const cid = ch[1];
         const name = ch[2].trim();
-        if (name && !name.includes("在线阅读") && !chapters.has(cid)) chapters.set(cid, name);
+        if (name && !name.includes("在线阅读")) entries.push([cid, name]);
       }
+      for (const [cid, name] of this._sortedChapters(entries)) chapters.set(cid, name);
       const title = titleM ? titleM[1] : `漫画${id}`;
       const desc = descM
         ? descM[1].replace(/<[^>]+>/g, "").trim()
