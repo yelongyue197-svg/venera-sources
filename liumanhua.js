@@ -5,7 +5,7 @@ class LiuManHua extends ComicSource {
   key = "liumanhua";
   version = "1.0.4";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/liumanhua.js";
+  url = "https://yelongyue197-svg.github.io/venera-sources/liumanhua.js";
   api = "https://www.liumanhua.com";
   mobile = "https://m.liumanhua.com";
 
