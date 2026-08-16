@@ -3,7 +3,7 @@ class MiaoQu extends ComicSource {
   // 妙趣漫画（MCCMS）：国内可直连，移动端页面服务端渲染，章节图片为 XOR+Base64 加密
   name = "妙趣漫画";
   key = "miaoqu";
-  version = "1.0.0";
+  version = "1.0.1";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/miaoqu.js";
   api = "https://www.miaoqumh.org";
@@ -55,6 +55,21 @@ class MiaoQu extends ComicSource {
     if (/^https?:/i.test(u)) return u;
     if (u.startsWith("//")) return "https:" + u;
     return base.replace(/\/+$/, "") + "/" + u.replace(/^\/+/, "");
+  }
+
+  _sortedChapters(entries) {
+    const num = (name, key) => {
+      const m1 = String(name).match(/第\s*(\d+)/);
+      if (m1) return parseInt(m1[1], 10);
+      const m2 = String(key).match(/^\d+\/(\d+)/);
+      if (m2) return parseInt(m2[1], 10);
+      const m3 = String(key).match(/(\d+)/);
+      return m3 ? parseInt(m3[1], 10) : 0;
+    };
+    return entries
+      .map((e, i) => ({ e, i, n: num(e[1], e[0]) }))
+      .sort((a, b) => (a.n - b.n) || (a.i - b.i))
+      .map((x) => x.e);
   }
 
   _parseList(html) {
@@ -155,15 +170,18 @@ class MiaoQu extends ComicSource {
       // 章节链接形如 /<漫画数字id>/<章节id>.html；key 存为 "漫画id/章节id" 便于 loadEp 直接拼 URL
       const chRe = /href="(\/\d+\/(\d+)\.html)"[^>]*>([\s\S]*?)<\/a>/g;
       let m;
+      const entries = [];
       while ((m = chRe.exec(html)) !== null) {
         const key = `${m[1].replace(/^\//, "").replace(/\.html$/, "")}`;
         const name = m[3].replace(/<[^>]+>/g, "").trim();
-        if (name && name !== "开始阅读" && !chapters.has(key)) chapters.set(key, name);
+        if (name && name !== "开始阅读") entries.push([key, name]);
       }
+      for (const [key, name] of this._sortedChapters(entries)) chapters.set(key, name);
       return new ComicDetails({
         title: titleM ? titleM[1].replace(/<[^>]+>/g, "").trim() : id,
         cover: coverM ? this._abs(coverM[1] || "", this.api) : "",
         chapters,
+        tags: {},
         description: descM ? descM[1].replace(/<[^>]+>/g, "").trim() : "",
       });
     },
