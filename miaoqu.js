@@ -3,9 +3,9 @@ class MiaoQu extends ComicSource {
   // 妙趣漫画（MCCMS）：国内可直连，移动端页面服务端渲染，章节图片为 XOR+Base64 加密
   name = "妙趣漫画";
   key = "miaoqu";
-  version = "1.0.4";
+  version = "1.0.6";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/miaoqu.js";
+  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.6/miaoqu.js";
   api = "https://www.miaoqumh.org";
   mobile = "https://m.miaoqumh.org";
 
@@ -133,6 +133,50 @@ class MiaoQu extends ComicSource {
     return chapters;
   }
 
+  _siteDecrypt(html, data, cid) {
+    // 直接执行站点自身的 pic.js 解密函数，key 表轮换也不受影响
+    return (async () => {
+      let picSrc = "";
+      const m = html.match(/<script[^>]+src="([^"]*pic\.js[^"]*)"/i);
+      if (m) {
+        picSrc = this._abs(m[1], this.api);
+      } else {
+        picSrc = `${this.api}/template/pc/tiantangmanhua/js/pic.js`;
+      }
+      const js = await this.fetchText(picSrc, this.api + "/", false);
+      // 提供站点脚本运行所需的最小环境
+      const g = typeof globalThis !== "undefined" ? globalThis : this;
+      if (!g.atob) {
+        const latin1 = (s) => {
+          const b = Convert.decodeBase64(s || "");
+          let out = "";
+          for (let i = 0; i < b.length; i++) out += String.fromCharCode(b[i]);
+          return out;
+        };
+        g.atob = latin1;
+        g.Base64 = { decode: latin1, encode: (s) => Convert.encodeBase64(Convert.encodeUtf8(s)) };
+        g.$ = () => ({ length: 0, eq: () => ({ on: () => {} }), on: () => {}, append: () => {}, hide: () => {}, show: () => {} });
+        g.window = { innerHeight: 900 };
+        g.document = {
+          documentElement: { clientHeight: 900, clientWidth: 1200 },
+          body: { scrollTop: 0, appendChild() {} },
+          createElement: () => ({ src: "", onload: null }),
+          getElementsByTagName: () => [{ appendChild() {} }],
+        };
+        g.Image = function () { this.src = ""; this.onload = null; };
+      }
+      const fn = new Function(
+        "DATA",
+        "cid",
+        js + "\n;return (typeof newImgs !== 'undefined' && newImgs) ? newImgs : null;"
+      );
+      const list = fn(data, cid);
+      return Array.isArray(list)
+        ? list.map((x) => (typeof x === "string" ? x : x && x.url)).filter(Boolean)
+        : [];
+    })();
+  }
+
   explore = [
     {
       title: this.name,
@@ -220,6 +264,7 @@ class MiaoQu extends ComicSource {
       const cid = parts.length > 1 ? parts[0] : comicId;
       const chid = parts.length > 1 ? parts[1] : epId;
       let data = null;
+      let pageHtml = "";
       let decryptCid = parseInt(chid, 10);
       const tryPage = async (url, referer, mobile) => {
         const page = await this.fetchText(url, referer, mobile);
@@ -227,6 +272,7 @@ class MiaoQu extends ComicSource {
         const c = page.match(/var\s+cid=(\d+)/);
         if (d) {
           data = d[1];
+          pageHtml = page;
           if (c) decryptCid = parseInt(c[1], 10);
           return true;
         }
@@ -270,7 +316,17 @@ class MiaoQu extends ComicSource {
           lastErr = e && e.message ? e.message : String(e);
         }
       }
-      if (images.length === 0) throw "章节图片解密结果为空";
+      if (images.length === 0) {
+        // 硬编码 key 全部失败：调用站点原生解密脚本（兼容 key 表轮换）
+        try {
+          images = await this._siteDecrypt(pageHtml, data, decryptCid);
+        } catch (e) {
+          log("warning", this.name, "站点原生解密失败：" + (e && e.message ? e.message : String(e)));
+        }
+      }
+      if (images.length === 0) {
+        throw "章节图片解密结果为空" + (lastErr ? "（" + lastErr + "）" : "");
+      }
       if (lastErr) log("warning", this.name, "解密兜底：" + lastErr);
       // 原图源 s2.bzcdn.net 在部分网络下不可达，替换为可达的 baozimh 静态域名（路径一致）
       return { images: images.map((u) => u.replace(/^https?:\/\/s2\.bzcdn\.net\//i, "https://static-tw.baozimh.com/")) };
