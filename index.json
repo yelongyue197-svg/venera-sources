@@ -177,30 +177,35 @@
     "name": "动漫啦",
     "fileName": "dongmanla.js",
     "key": "dongmanla",
-    "version": "1.0.1"
+    "version": "1.0.2",
+    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/dongmanla.js"
   },
   {
     "name": "咚漫",
     "fileName": "dongmanmanhua.js",
     "key": "dongmanmanhua",
-    "version": "1.0.1"
+    "version": "1.0.2",
+    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/dongmanmanhua.js"
   },
   {
     "name": "妙趣漫画",
     "fileName": "miaoqu.js",
     "key": "miaoqu",
-    "version": "1.0.1"
+    "version": "1.0.2",
+    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/miaoqu.js"
   },
   {
     "name": "六漫画",
     "fileName": "liumanhua.js",
     "key": "liumanhua",
-    "version": "1.0.1"
+    "version": "1.0.2",
+    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/liumanhua.js"
   },
   {
     "name": "动漫屋",
     "fileName": "dm5.js",
     "key": "dm5",
-    "version": "1.0.1"
+    "version": "1.0.2",
+    "url": "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/dm5.js"
   }
 ]
