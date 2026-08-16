@@ -5,7 +5,7 @@ class MiaoQu extends ComicSource {
   key = "miaoqu";
   version = "1.0.7";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.7/miaoqu.js";
+  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/miaoqu.js";
   api = "https://www.miaoqumh.org";
   mobile = "https://m.miaoqumh.org";
 
