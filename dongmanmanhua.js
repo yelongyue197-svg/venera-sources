@@ -5,7 +5,7 @@ class DongManManHua extends ComicSource {
   key = "dongmanmanhua";
   version = "1.0.2";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/dongmanmanhua.js";
+  url = "https://yelongyue197-svg.github.io/venera-sources/dongmanmanhua.js";
   api = "https://www.dongmanmanhua.cn";
 
   init() {
