@@ -3,7 +3,7 @@ class LiuManHua extends ComicSource {
   // 六漫画（MCCMS）：国内可直连，章节图片为 AES-128-CBC 加密，解密后得到图片列表
   name = "六漫画";
   key = "liumanhua";
-  version = "1.0.4";
+  version = "1.0.5";
   minAppVersion = "1.4.0";
   url = "https://yelongyue197-svg.github.io/venera-sources/liumanhua.js";
   api = "https://www.liumanhua.com";
@@ -51,17 +51,24 @@ class LiuManHua extends ComicSource {
     return base.replace(/\/+$/, "") + "/" + u.replace(/^\/+/, "");
   }
 
-  _sortedChapters(entries) {
-    const num = (name, key) => {
-      const m1 = String(name).match(/第\s*(\d+)/);
-      if (m1) return parseInt(m1[1], 10);
-      const m2 = String(key).match(/(\d+)/);
-      return m2 ? parseInt(m2[1], 10) : 0;
-    };
-    return entries
-      .map((e, i) => ({ e, i, n: num(e[1], e[0]) }))
-      .sort((a, b) => (a.n - b.n) || (a.i - b.i))
-      .map((x) => x.e);
+  _chapterNum(name, idx) {
+    const s = String(name);
+    // "第N季/第N卷" 与 "第M话/回/章/集" 组合：按季*100000+话 排序
+    const seasonM = s.match(/第\s*(\d+)\s*(?:季|卷)/);
+    const epM = s.match(/第\s*(\d+)\s*(?:话|回|章|集)/);
+    let n;
+    if (epM) {
+      const ep = parseInt(epM[1], 10);
+      n = seasonM ? parseInt(seasonM[1], 10) * 100000 + ep : ep;
+    } else {
+      // "总N…" / "N…" / "00N" 等开头数字格式
+      const m2 = s.match(/^总?(\d{1,5})/);
+      n = m2 ? parseInt(m2[1], 10) : 900000 + idx;
+    }
+    // 上下篇微调：上排在前、下排在后
+    if (/（上）|[·.\s]上$/.test(s)) n += 0.1;
+    else if (/（下）|[·.\s]下$/.test(s)) n += 0.2;
+    return n;
   }
 
   _parseList(html) {
@@ -98,18 +105,26 @@ class LiuManHua extends ComicSource {
   }
 
   _parseChapters(html) {
-    const chapters = new Map();
     const chRe = /href="(\/\d+\/(\d+)\.html)"[^>]*>([\s\S]*?)<\/a>/g;
     let m;
-    const entries = [];
+    const items = [];
+    let idx = 0;
     while ((m = chRe.exec(html)) !== null) {
       const chid = m[2];
       const name = m[3].replace(/<[^>]+>/g, "").trim();
       if (name && !["开始阅读", "在线阅读", "继续阅读下一章节", "下一章"].includes(name)) {
-        entries.push([chid, name]);
+        items.push({ id: chid, name, n: this._chapterNum(name, idx), idx: idx++ });
       }
     }
-    for (const [chid, name] of this._sortedChapters(entries)) chapters.set(chid, name);
+    // 站点偶发重复 id（同一 id 出现在不同章节名里）：保留章节号更小的那条
+    const best = new Map();
+    for (const it of items) {
+      const prev = best.get(it.id);
+      if (!prev || it.n < prev.n) best.set(it.id, it);
+    }
+    const sorted = [...best.values()].sort((a, b) => (a.n - b.n) || (a.idx - b.idx));
+    const chapters = new Map();
+    for (const it of sorted) chapters.set(it.id, it.name);
     return chapters;
   }
 
