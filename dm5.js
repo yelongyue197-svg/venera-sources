@@ -5,7 +5,7 @@ class DongManWu extends ComicSource {
   key = "dm5";
   version = "1.0.5";
   minAppVersion = "1.4.0";
-  url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@main/dm5.js";
+  url = "https://yelongyue197-svg.github.io/venera-sources/dm5.js";
   api = "https://www.dm5.com";
 
   init() {
