@@ -3,7 +3,7 @@ class LiuManHua extends ComicSource {
   // 六漫画（MCCMS）：国内可直连，章节图片为 AES-128-CBC 加密，解密后得到图片列表
   name = "六漫画";
   key = "liumanhua";
-  version = "1.0.2";
+  version = "1.0.3";
   minAppVersion = "1.4.0";
   url = "https://cdn.jsdelivr.net/gh/yelongyue197-svg/venera-sources@v1.0.2/liumanhua.js";
   api = "https://www.liumanhua.com";
@@ -28,11 +28,18 @@ class LiuManHua extends ComicSource {
     };
     this.fetchText = async (url, referer, mobile) => {
       const headers = mobile ? this.mobileHeaders : this.desktopHeaders;
-      const resp = await Network.get(url, { ...headers, Referer: referer || this.api + "/" });
-      if (resp.status !== 200) {
-        throw `HTTP ${resp.status}: ${url}`;
+      let lastErr = "";
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const resp = await Network.get(url, { ...headers, Referer: referer || this.api + "/" });
+          if (resp.status === 200) return resp.body;
+          lastErr = `HTTP ${resp.status}: ${url}`;
+        } catch (e) {
+          lastErr = e && e.message ? e.message : String(e);
+        }
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 600));
       }
-      return resp.body;
+      throw lastErr || `请求失败：${url}`;
     };
   }
 
@@ -90,6 +97,22 @@ class LiuManHua extends ComicSource {
     return comics.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
   }
 
+  _parseChapters(html) {
+    const chapters = new Map();
+    const chRe = /href="(\/\d+\/(\d+)\.html)"[^>]*>([\s\S]*?)<\/a>/g;
+    let m;
+    const entries = [];
+    while ((m = chRe.exec(html)) !== null) {
+      const chid = m[2];
+      const name = m[3].replace(/<[^>]+>/g, "").trim();
+      if (name && !["开始阅读", "在线阅读", "继续阅读下一章节", "下一章"].includes(name)) {
+        entries.push([chid, name]);
+      }
+    }
+    for (const [chid, name] of this._sortedChapters(entries)) chapters.set(chid, name);
+    return chapters;
+  }
+
   explore = [
     {
       title: this.name,
@@ -139,24 +162,24 @@ class LiuManHua extends ComicSource {
 
   comic = {
     loadInfo: async (id) => {
-      const url = `${this.api}/${id}`;
-      const html = await this.fetchText(url, this.api + "/", false);
+      let html = "";
+      try {
+        html = await this.fetchText(`${this.api}/${id}`, this.api + "/", false);
+      } catch (e) {
+        html = await this.fetchText(`${this.mobile}/${id}`, this.api + "/", true);
+      }
       const titleM = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
       const coverM =
         html.match(/<div class="cy_info_cover">[\s\S]*?<img[^>]+src="([^"]+)"/i) ||
         html.match(/<div class="de-info__cover"[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)="([^"]+)"/i) ||
         html.match(/<img[^>]+src="([^"]+)"[^>]*class="[^"]*cover[^"]*"/i);
       const descM = html.match(/<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-      const chapters = new Map();
-      const chRe = /href="(\/\d+\/(\d+)\.html)"[^>]*>([\s\S]*?)<\/a>/g;
-      let m;
-      const entries = [];
-      while ((m = chRe.exec(html)) !== null) {
-        const chid = m[2];
-        const name = m[3].replace(/<[^>]+>/g, "").trim();
-        if (name && name !== "在线阅读") entries.push([chid, name]);
+      let chapters = this._parseChapters(html);
+      if (chapters.size === 0) {
+        // 桌面页解析为空（可能被反爬拦截）时尝试移动端详情页
+        const mhtml = await this.fetchText(`${this.mobile}/${id}`, this.api + "/", true);
+        chapters = this._parseChapters(mhtml);
       }
-      for (const [chid, name] of this._sortedChapters(entries)) chapters.set(chid, name);
       return new ComicDetails({
         title: titleM ? titleM[1].replace(/<[^>]+>/g, "").trim() : `漫画${id}`,
         cover: coverM ? this._abs(coverM[1] || coverM[2] || "", this.api) : "",
