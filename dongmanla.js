@@ -3,7 +3,7 @@ class DongManLa extends ComicSource {
   // 动漫啦（原盒子漫画）：国内可直连、无广告、图片直链
   name = "动漫啦";
   key = "dongmanla";
-  version = "1.0.2";
+  version = "1.0.3";
   minAppVersion = "1.4.0";
   url = "https://yelongyue197-svg.github.io/venera-sources/dongmanla.js";
   api = "https://www.dongman.la";
@@ -95,16 +95,36 @@ class DongManLa extends ComicSource {
   }
 
   _sortedChapters(entries) {
-    const num = (name, key) => {
-      const m1 = String(name).match(/第\s*(\d+)/);
-      if (m1) return parseInt(m1[1], 10);
-      const m2 = String(key).match(/\/chapter\/\d+\/(\d+)\//);
-      if (m2) return parseInt(m2[1], 10);
-      const m3 = String(key).match(/(\d+)/);
-      return m3 ? parseInt(m3[1], 10) : 0;
+    const num = (name, key, i) => {
+      const s = String(name);
+      // 后记/预告等特殊章节：预告、序章排最前，后记排最后
+      if (/后记|后日谈/.test(s)) return 900000 + i;
+      // 番外/外传/特别篇：排在正章之后
+      const special = /番外|外传|特别篇|特典/.test(s);
+      if (/预告|序章|楔子/.test(s)) return special ? 100000 : 0;
+      // 章节号：优先 "第N话/回/章/集"，其次名称中的 "N话/回/章/集"（支持 11.5 这类小数）
+      let n = null;
+      const m1 = s.match(/第\s*(\d+(?:\.\d+)?)/);
+      if (m1) {
+        n = parseFloat(m1[1]);
+      } else {
+        const m2 = s.match(/(\d+(?:\.\d+)?)\s*(?:话|回|章|集)/);
+        if (m2) n = parseFloat(m2[1]);
+      }
+      if (n != null) return (special ? 100000 : 0) + n;
+      // 番外/外传带编号但无"话"字（如"番外02"）
+      if (special) {
+        const ms = s.match(/(\d+(?:\.\d+)?)/);
+        return 100000 + (ms ? parseFloat(ms[1]) : i);
+      }
+      // 纯数字名称（如 "1"、"01"）
+      const m3 = s.match(/^0*(\d{1,6})$/);
+      if (m3) return parseInt(m3[1], 10);
+      // 其他无编号章节排最后
+      return 900000 + i;
     };
     return entries
-      .map((e, i) => ({ e, i, n: num(e[1], e[0]) }))
+      .map((e, i) => ({ e, i, n: num(e[1], e[0], i) }))
       .sort((a, b) => (a.n - b.n) || (a.i - b.i))
       .map((x) => x.e);
   }
