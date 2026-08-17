@@ -3,7 +3,7 @@ class DongManLa extends ComicSource {
   // 动漫啦（原盒子漫画）：国内可直连、无广告、图片直链
   name = "动漫啦";
   key = "dongmanla";
-  version = "1.0.3";
+  version = "1.0.4";
   minAppVersion = "1.4.0";
   url = "https://yelongyue197-svg.github.io/venera-sources/dongmanla.js";
   api = "https://www.dongman.la";
@@ -245,8 +245,14 @@ class DongManLa extends ComicSource {
     },
 
     loadEp: async (comicId, epId) => {
-      const url = `${this.api}/manhua/chapter/${comicId}/${epId}/`;
-      const html = await this.fetchText(url, `${this.api}/manhua/detail/${comicId}/`);
+      const base = `${this.api}/manhua/chapter/${comicId}/${epId}`;
+      // 章节按页拆分（/1.html … /15.html），单页版 all.html 包含全部图片
+      let html = "";
+      try {
+        html = await this.fetchText(base + "/all.html", `${this.api}/manhua/detail/${comicId}/`);
+      } catch (e) {
+        html = await this.fetchText(base + "/", `${this.api}/manhua/detail/${comicId}/`);
+      }
       const images = [];
       const imgRe = /<img[^>]+src="(https:\/\/img\.dongman\.la\/[^"]+)"/g;
       let m;
